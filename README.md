@@ -6,4 +6,13 @@ TG bot for CBT diary
 
 - Write SMER
 - Write Braindump
-- Get SMERs PDF
+- Export SMERs to PDF
+
+### ✅: Todo:
+
+- Get short SMERs by period
+- Select SMERs to hide from export
+- Find cognitive distortions
+- SMER steps setup
+- Work with hot thoughts
+- Work with thougts chains
