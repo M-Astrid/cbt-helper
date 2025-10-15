@@ -8,7 +8,7 @@ TG bot for CBT diary
 - Write Braindump
 - Export SMERs to PDF
 
-### ✅: Todo:
+### ✅ Todo:
 
 - Get short SMERs by period
 - Select SMERs to hide from export
