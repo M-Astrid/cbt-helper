@@ -1,15 +1,26 @@
 package entity
 
-import "time"
+import (
+	"time"
+
+	"github.com/google/uuid"
+)
 
 type SMEREntry struct {
-	ID          int64
+	ID          string
+	UserID      int64
 	CreatedTime time.Time
+	UpdatedTime time.Time
+	Trigger     *Trigger
+	Emotions    []*Emotion
+	Thoughts    []*Thought
 }
 
-func NewSMEREntry() *SMEREntry {
+func NewSMEREntry(userID int64) *SMEREntry {
 	return &SMEREntry{
-		ID:          0,
+		ID:          uuid.New().String(),
+		UserID:      userID,
 		CreatedTime: time.Now(),
+		UpdatedTime: time.Now(),
 	}
 }

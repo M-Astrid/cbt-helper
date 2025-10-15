@@ -3,6 +3,7 @@ package steps
 import (
 	"fmt"
 
+	"github.com/M-Astrid/cbt-helper/internal/domain/entity"
 	"github.com/M-Astrid/cbt-helper/internal/presentation/tgbot/common"
 	"gopkg.in/tucnak/telebot.v2"
 )
@@ -16,9 +17,8 @@ func (ch StepSMERTrigger) Start(bot *telebot.Bot, rec telebot.Recipient, _ int64
 	bot.Send(rec, "Что произошло и послужило триггером эмоций?")
 }
 
-func (ch StepSMERTrigger) HandleTextInput(bot *telebot.Bot, m *telebot.Message, userID int64, state *UserState) {
-	//storage.TriggerRepository.Save(&entity.Trigger{
-	//
-	//})
+func (ch StepSMERTrigger) HandleInput(bot *telebot.Bot, m *telebot.Message, userID int64, state *UserState) error {
+	state.SMER.Trigger = entity.NewTrigger(m.Text)
 	bot.Send(m.Sender, fmt.Sprintf("Сохранили вашу ситуацию: %s", m.Text))
+	return nil
 }

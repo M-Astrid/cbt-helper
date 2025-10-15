@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/M-Astrid/cbt-helper/internal/domain/entity"
 	"github.com/M-Astrid/cbt-helper/internal/presentation/tgbot/common"
 	"gopkg.in/tucnak/telebot.v2"
 )
@@ -17,13 +18,18 @@ func (ch StepSMEREmotions) Start(bot *telebot.Bot, rec telebot.Recipient, _ int6
 	bot.Send(rec, "Какие эмоции вы испытали?")
 }
 
-func (ch StepSMEREmotions) HandleTextInput(bot *telebot.Bot, m *telebot.Message, userID int64, state *UserState) {
+func (ch StepSMEREmotions) HandleInput(bot *telebot.Bot, m *telebot.Message, userID int64, state *UserState) error {
 	parts := strings.Split(m.Text, ",")
-	for i, p := range parts {
+	for _, p := range parts {
 		p = strings.TrimSpace(p)
-		parts[i] = p
-		fmt.Println(p)
-		// todo: save emotion
+		ems := strings.Split(p, " ")
+		em, err := entity.NewEmotion(strings.TrimSpace(ems[0]), strings.TrimSpace(ems[1]))
+		if err != nil {
+			bot.Send(m.Sender, fmt.Sprintf("Ошибка сохранения эмоции: %v", err))
+			return err
+		}
+		state.SMER.Emotions = append(state.SMER.Emotions, em)
 	}
 	bot.Send(m.Sender, fmt.Sprintf("Сохранили эмоции %v", parts))
+	return nil
 }

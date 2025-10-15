@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8" />
+    <title>Дневник СМЭР</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 20px;
+        }
+        h2 {
+            text-align: left;
+            color: #666666;
+        }
+        .entry {
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        .entry-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
+        .timestamp {
+            font-size: 0.9em;
+            color: #666;
+        }
+        .trigger, .emotions, .thoughts {
+            margin-bottom: 8px;
+        }
+        .section-title {
+            font-weight: bold;
+            margin-bottom: 4px;
+        }
+        ul {
+            padding-left: 20px;
+            margin: 0;
+        }
+        li {
+            margin-bottom: 4px;
+        }
+    </style>
+</head>
+<body>
+<h2>СМЭР {{date_from}}-{{date_to}}</h2>
+
+{{#if entries}}
+{{#each entries}}
+<div class="entry">
+    <div class="entry-header">
+        <div class="timestamp">Создано: {{CreatedTime}}</div>
+    </div>
+
+    {{#if Trigger}}
+    <div class="trigger">
+        <div class="section-title">Триггер:</div>
+        <div>{{Trigger.Description}}</div>
+    </div>
+    {{/if}}
+
+    {{#if Emotions}}
+    <div class="emotions">
+        <div class="section-title">Эмоции:</div>
+        <ul>
+            {{#each Emotions}}
+            <li>
+                {{Name}} ({{Scale}})
+            </li>
+            {{/each}}
+        </ul>
+    </div>
+    {{/if}}
+
+    {{#if Thoughts}}
+    <div class="thoughts">
+        <div class="section-title">Мысли:</div>
+        <ul>
+            {{#each Thoughts}}
+            <li>{{Description}}</li>
+            {{/each}}
+        </ul>
+    </div>
+    {{/if}}
+</div>
+{{/each}}
+{{else}}
+<p>Нет записей для отображения.</p>
+{{/if}}
+</body>
+</html>
