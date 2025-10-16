@@ -1,4 +1,4 @@
-# cbt-helper
+# CBT helper bot
 
 TG bot for CBT diary  
 
