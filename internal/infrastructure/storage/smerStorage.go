@@ -11,28 +11,33 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-type SMEREmotion struct {
-	EmotionID int64  `bson:"emotion_id"`
-	Name      string `bson:"name"`
-	SmerID    int64  `bson:"smer_id"`
-	Scale     int    `bson:"scale"`
-}
-
-type Thought struct {
-	ID          int64     `bson:"id"`
-	Description string    `bson:"description"`
-	SmerID      int64     `bson:"smer_id"`
-	CreatedTime time.Time `bson:"created_time"`
-	UpdatedTime time.Time `bson:"updated_time"`
-}
+//
+//type Emotion struct {
+//	Name  string `bson:"name"`
+//	Scale int    `bson:"scale"`
+//}
+//
+//type Thought struct {
+//	Description string `bson:"description"`
+//}
+//
+//type Action struct {
+//	Description string `bson:"description"`
+//}
+//
+//type Trigger struct {
+//	Description string `bson:"description"`
+//}
 
 type SMEREntry struct {
-	ID          string        `bson:"_id,omitempty"`
-	UserID      int64         `bson:"user_id"`
-	CreatedTime time.Time     `bson:"created_time"`
-	UpdatedTime time.Time     `bson:"updated_time"`
-	Emotions    []SMEREmotion `bson:"emotions"`
-	Thoughts    []Thought     `bson:"thoughts"`
+	ID          string            `bson:"_id,omitempty"`
+	UserID      int64             `bson:"user_id"`
+	CreatedTime time.Time         `bson:"created_time"`
+	UpdatedTime time.Time         `bson:"updated_time"`
+	Emotions    []*entity.Emotion `bson:"emotions"`
+	Thoughts    []*entity.Thought `bson:"thoughts"`
+	Action      *entity.Action    `bson:"action"`
+	Trigger     *entity.Trigger   `bson:"trigger"`
 }
 
 type SMERStorage struct {
@@ -70,17 +75,43 @@ func (adapter *SMERStorage) Save(ctx context.Context, entry *entity.SMEREntry) e
 	}
 	entry.UpdatedTime = now
 
+	db_entry := SMEREntry{
+		UserID:      entry.UserID,
+		CreatedTime: entry.CreatedTime,
+		UpdatedTime: entry.UpdatedTime,
+		Trigger:     entry.Trigger,
+		Emotions:    entry.Emotions,
+		Thoughts:    entry.Thoughts,
+		//Action:      entry.Action,
+	}
+	//for _, em := range entry.Emotions {
+	//	db_entry.Emotions = append(db_entry.Emotions, Emotion{em.Name, em.Scale})
+	//}
+	//for _, th := range entry.Thoughts {
+	//	db_entry.Thoughts = append(db_entry.Thoughts, Thought{th.Description})
+	//}
+	//if entry.Action != nil {
+	//	db_entry.Action = &Action{entry.Action.Description}
+	//}
+
 	filter := bson.M{"_id": primitive.NewObjectID()}
-	update := bson.M{"$set": entry}
+	update := bson.M{"$set": db_entry}
 	opts := options.Update().SetUpsert(true)
 
 	_, err := adapter.smerCollection.UpdateOne(ctx, filter, update, opts)
 	return err
 }
 
-func (adapter *SMERStorage) GetByUserID(ctx context.Context, id int64) ([]*entity.SMEREntry, error) {
-	filter := bson.M{}
-	//filter := bson.M{"user_id": id}  todo: find out why this filter gives empty result
+func (adapter *SMERStorage) GetByUserID(ctx context.Context, id int64, startDate time.Time, endDate time.Time) ([]*entity.SMEREntry, error) {
+	//filter := bson.M{}
+	//filter := bson.M{"created_time": bson.M{"$gte": startDate, "$lte": endDate}}
+	filter := bson.D{
+		{"$and",
+			bson.A{
+				bson.D{{"created_time", bson.D{{"$gt", startDate}}}},
+				bson.D{{"created_time", bson.D{{"$lt", endDate}}}},
+			}},
+	}
 
 	cursor, err := adapter.smerCollection.Find(ctx, filter)
 	if err != nil {
@@ -88,9 +119,9 @@ func (adapter *SMERStorage) GetByUserID(ctx context.Context, id int64) ([]*entit
 	}
 	defer cursor.Close(ctx)
 
-	var entries []*entity.SMEREntry
+	var entries []*SMEREntry
 	for cursor.Next(ctx) {
-		var entry entity.SMEREntry
+		var entry SMEREntry
 		if err := cursor.Decode(&entry); err != nil {
 			continue
 		}
@@ -101,10 +132,32 @@ func (adapter *SMERStorage) GetByUserID(ctx context.Context, id int64) ([]*entit
 		return nil, err
 	}
 
-	return entries, nil
-}
+	res := make([]*entity.SMEREntry, len(entries))
+	for i, entry := range entries {
+		res[i] = &entity.SMEREntry{
+			UserID:      entry.UserID,
+			CreatedTime: entry.CreatedTime,
+			UpdatedTime: entry.UpdatedTime,
+			Trigger:     entry.Trigger,
+			Emotions:    entry.Emotions,
+			Thoughts:    entry.Thoughts,
+			//Action:      entry.Action,
+		}
+		//for _, em := range entry.Emotions {
+		//	res[i].Emotions = append(res[i].Emotions, &entity.Emotion{
+		//		Name:  em.Name,
+		//		Scale: em.Scale,
+		//	})
+		//}
+		//for _, th := range entry.Thoughts {
+		//	res[i].Thoughts = append(res[i].Thoughts, &entity.Thought{
+		//		Description: th.Description,
+		//	})
+		//}
+	}
 
-// Закрытие соединения
+	return res, nil
+}
 
 func (adapter *SMERStorage) Close(ctx context.Context) error {
 	return adapter.client.Disconnect(ctx)

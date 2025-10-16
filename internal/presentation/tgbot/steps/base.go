@@ -1,7 +1,7 @@
 package steps
 
 import (
-	"gopkg.in/tucnak/telebot.v2"
+	"gopkg.in/telebot.v3"
 )
 
 type StepI interface {

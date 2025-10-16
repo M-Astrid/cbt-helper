@@ -1,8 +1,0 @@
-package common
-
-const (
-	SMER_STEP_TRIGGER = iota
-	SMER_STEP_EMOTION
-	SMER_STEP_THOUGHTS
-	SMER_STEP_SAVE_RESULT
-)

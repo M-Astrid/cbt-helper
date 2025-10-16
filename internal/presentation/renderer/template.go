@@ -10,16 +10,15 @@ import (
 var ErrFileNotFound = fmt.Errorf("file not found")
 var ErrTemplateRender = fmt.Errorf("template render error")
 
-type HTMLRendererI interface {
-	Render(data map[string]interface{}) (*string, error)
+type TemplateRendererI interface {
+	Render(data map[string]interface{}, templatePath string) (*string, error)
 }
 
-type HTMLRenderer struct {
-	templatePath string
+type TemplateRenderer struct {
 }
 
-func (s HTMLRenderer) Render(data map[string]interface{}) (*string, error) {
-	tpl, err := os.ReadFile(s.templatePath)
+func (s TemplateRenderer) Render(data map[string]interface{}, templatePath string) (*string, error) {
+	tpl, err := os.ReadFile(templatePath)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrFileNotFound, err)
 	}
@@ -32,6 +31,6 @@ func (s HTMLRenderer) Render(data map[string]interface{}) (*string, error) {
 	return &result, nil
 }
 
-func NewRenderer(path string) HTMLRendererI {
-	return &HTMLRenderer{templatePath: path}
+func NewRenderer() TemplateRendererI {
+	return &TemplateRenderer{}
 }

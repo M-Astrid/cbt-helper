@@ -5,8 +5,7 @@ import (
 	"strings"
 
 	"github.com/M-Astrid/cbt-helper/internal/domain/entity"
-	"github.com/M-Astrid/cbt-helper/internal/presentation/tgbot/common"
-	"gopkg.in/tucnak/telebot.v2"
+	"gopkg.in/telebot.v3"
 )
 
 type StepSMEREmotions struct {
@@ -14,12 +13,11 @@ type StepSMEREmotions struct {
 }
 
 func (ch StepSMEREmotions) Start(bot *telebot.Bot, rec telebot.Recipient, _ int64, state *UserState) {
-	state.CurrentSMERStepType = common.SMER_STEP_EMOTION
 	bot.Send(rec, "Какие эмоции вы испытали?")
 }
 
 func (ch StepSMEREmotions) HandleInput(bot *telebot.Bot, m *telebot.Message, userID int64, state *UserState) error {
-	parts := strings.Split(m.Text, ",")
+	parts := strings.Split(m.Text, "\n")
 	for _, p := range parts {
 		p = strings.TrimSpace(p)
 		ems := strings.Split(p, " ")
@@ -30,6 +28,5 @@ func (ch StepSMEREmotions) HandleInput(bot *telebot.Bot, m *telebot.Message, use
 		}
 		state.SMER.Emotions = append(state.SMER.Emotions, em)
 	}
-	bot.Send(m.Sender, fmt.Sprintf("Сохранили эмоции %v", parts))
 	return nil
 }

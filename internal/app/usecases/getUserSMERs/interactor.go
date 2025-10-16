@@ -2,6 +2,7 @@ package getUserSMERsUsecase
 
 import (
 	"context"
+	"time"
 
 	"github.com/M-Astrid/cbt-helper/internal/app/port"
 	"github.com/M-Astrid/cbt-helper/internal/domain/entity"
@@ -17,6 +18,6 @@ func NewInteractor(storage port.SMERStorageI) *Interactor {
 	}
 }
 
-func (i *Interactor) Call(ctx context.Context, userId int64) ([]*entity.SMEREntry, error) {
-	return i.storage.GetByUserID(ctx, userId)
+func (i *Interactor) Call(ctx context.Context, userId int64, startDate time.Time, endDate time.Time) ([]*entity.SMEREntry, error) {
+	return i.storage.GetByUserID(ctx, userId, startDate, endDate)
 }
