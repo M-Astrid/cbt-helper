@@ -1,0 +1,18 @@
+<b>Результат:</b> 📝 Запись СМЭР
+<code>ID: {{entry.ID}}</code>
+
+{{#if entry.Trigger}}
+<b>Триггер:</b> {{entry.Trigger.Description}}
+{{/if}}
+{{#if entry.Emotions}}
+<b>Эмоции:</b>
+{{#each entry.Emotions}}
+  - {{Name}} ({{Scale}})
+{{/each}}
+{{/if}}
+{{#if entry.Thoughts}}
+<b>Мысли:</b>
+{{#each entry.Thoughts}}
+  - {{Description}}
+{{/each}}
+{{/if}}

@@ -114,11 +114,11 @@ func main() {
 					c.Send(fmt.Sprintf("Произошла ошибка: %s", err))
 				}
 
-				return c.Send(fmt.Sprintf("Результат: %s", *msg), &telebot.ReplyMarkup{
+				return c.Send(fmt.Sprintf("%s", *msg), &telebot.SendOptions{ReplyMarkup: &telebot.ReplyMarkup{
 					InlineKeyboard: [][]telebot.InlineButton{
 						{telebot.InlineButton{Unique: "save_smer", Text: "Сохранить"}},
 					},
-				})
+				}, ParseMode: telebot.ModeHTML})
 			}
 
 			calendar := tb_cal.NewCalendar(bot, tb_cal.Options{})
@@ -348,7 +348,7 @@ func main() {
 		userID := c.Sender().ID
 		state := userStates[userID]
 		state.Status = common.PICK_DOC_DATE_FROM_STATUS
-		userStates[8403079291] = state
+		userStates[8403079291] = state // todo: find out why calendar change userID
 		return c.Send("Выберите дату начала", &telebot.ReplyMarkup{
 			InlineKeyboard: calendar.GetKeyboard(),
 		})

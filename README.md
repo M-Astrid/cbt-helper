@@ -10,9 +10,9 @@ TG bot for CBT diary
 
 ### ✅ Todo:
 
-- Get short SMERs by period
 - Select SMERs to hide from export
-- Find cognitive distortions
+- AI text parse
+- AI analyze thoughts
+- Fix cognitive distortions
 - SMER steps setup
-- Work with hot thoughts
-- Work with thougts chains
+- Work with thought chains
