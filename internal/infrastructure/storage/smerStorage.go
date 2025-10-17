@@ -108,8 +108,8 @@ func (adapter *SMERStorage) GetByUserID(ctx context.Context, id int64, startDate
 	filter := bson.D{
 		{"$and",
 			bson.A{
-				bson.D{{"created_time", bson.D{{"$gt", startDate}}}},
-				bson.D{{"created_time", bson.D{{"$lt", endDate}}}},
+				bson.D{{"created_time", bson.D{{"$gte", startDate}}}},
+				bson.D{{"created_time", bson.D{{"$lte", endDate}}}},
 			}},
 	}
 
