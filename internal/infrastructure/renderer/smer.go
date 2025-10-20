@@ -9,6 +9,7 @@ import (
 type SmerRendererI interface {
 	RenderPDF(smers []*entity.SMEREntry, startDate time.Time, endDate time.Time) ([]byte, error)
 	RenderMessageSingle(smer *entity.SMEREntry) (*string, error)
+	RenderShortSingle(smer *entity.SMEREntry) (*string, error)
 }
 
 type SmerRenderer struct {
@@ -32,6 +33,16 @@ func (s SmerRenderer) RenderMessageSingle(smer *entity.SMEREntry) (*string, erro
 	txt, err := s.templateRenderer.Render(map[string]interface{}{
 		"entry": smer,
 	}, SmerSingleMessageTemplatePath)
+	if err != nil {
+		return nil, err
+	}
+	return txt, nil
+}
+
+func (s SmerRenderer) RenderShortSingle(smer *entity.SMEREntry) (*string, error) {
+	txt, err := s.templateRenderer.Render(map[string]interface{}{
+		"entry": smer,
+	}, SmerShortSingleMessageTemplatePath)
 	if err != nil {
 		return nil, err
 	}

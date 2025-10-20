@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context"
+	"log"
 	"time"
 
 	"github.com/M-Astrid/cbt-helper/internal/domain/entity"
@@ -94,7 +95,7 @@ func (adapter *SMERStorage) Save(ctx context.Context, entry *entity.SMEREntry) e
 	//	db_entry.Action = &Action{entry.Action.Description}
 	//}
 
-	filter := bson.M{"_id": primitive.NewObjectID()}
+	filter := bson.M{"_id": db_entry.ID}
 	update := bson.M{"$set": db_entry}
 	opts := options.Update().SetUpsert(true)
 
@@ -102,9 +103,28 @@ func (adapter *SMERStorage) Save(ctx context.Context, entry *entity.SMEREntry) e
 	return err
 }
 
+func (adapter *SMERStorage) GetByID(ctx context.Context, id string) (*entity.SMEREntry, error) {
+	id_, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		return nil, err
+	}
+	filter := bson.M{"_id": id_}
+	res := adapter.smerCollection.FindOne(ctx, filter)
+	var entry SMEREntry
+	err = res.Decode(&entry)
+	return &entity.SMEREntry{
+		ID:          entry.ID,
+		UserID:      entry.UserID,
+		CreatedTime: entry.CreatedTime,
+		UpdatedTime: entry.UpdatedTime,
+		Trigger:     entry.Trigger,
+		Emotions:    entry.Emotions,
+		Thoughts:    entry.Thoughts,
+		//Action:      entry.Action,
+	}, err
+}
+
 func (adapter *SMERStorage) GetByUserID(ctx context.Context, id int64, startDate time.Time, endDate time.Time) ([]*entity.SMEREntry, error) {
-	//filter := bson.M{}
-	//filter := bson.M{"created_time": bson.M{"$gte": startDate, "$lte": endDate}}
 	filter := bson.D{
 		{"$and",
 			bson.A{
@@ -123,6 +143,7 @@ func (adapter *SMERStorage) GetByUserID(ctx context.Context, id int64, startDate
 	for cursor.Next(ctx) {
 		var entry SMEREntry
 		if err := cursor.Decode(&entry); err != nil {
+			log.Println("Ошибка декодирования:", err)
 			continue
 		}
 		entries = append(entries, &entry)
@@ -135,6 +156,7 @@ func (adapter *SMERStorage) GetByUserID(ctx context.Context, id int64, startDate
 	res := make([]*entity.SMEREntry, len(entries))
 	for i, entry := range entries {
 		res[i] = &entity.SMEREntry{
+			ID:          entry.ID,
 			UserID:      entry.UserID,
 			CreatedTime: entry.CreatedTime,
 			UpdatedTime: entry.UpdatedTime,
@@ -157,6 +179,16 @@ func (adapter *SMERStorage) GetByUserID(ctx context.Context, id int64, startDate
 	}
 
 	return res, nil
+}
+
+func (adapter *SMERStorage) DeleteByID(ctx context.Context, id string) error {
+	id_, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		return err
+	}
+	filter := bson.M{"_id": id_}
+	_, err = adapter.smerCollection.DeleteOne(ctx, filter)
+	return err
 }
 
 func (adapter *SMERStorage) Close(ctx context.Context) error {

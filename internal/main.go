@@ -7,16 +7,19 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 	"time"
 
+	deleteSMERUsecase "github.com/M-Astrid/cbt-helper/internal/app/usecases/deleteSMER"
+	getSingleSMERUsecase "github.com/M-Astrid/cbt-helper/internal/app/usecases/getSingleSMER"
 	getUserSMERsUsecase "github.com/M-Astrid/cbt-helper/internal/app/usecases/getUserSMERs"
 	saveSMERUsecase "github.com/M-Astrid/cbt-helper/internal/app/usecases/saveSMER"
 	"github.com/M-Astrid/cbt-helper/internal/domain/entity"
 	domainError "github.com/M-Astrid/cbt-helper/internal/domain/error"
+	"github.com/M-Astrid/cbt-helper/internal/infrastructure/renderer"
 	"github.com/M-Astrid/cbt-helper/internal/infrastructure/storage"
-	"github.com/M-Astrid/cbt-helper/internal/presentation/renderer"
-	"github.com/M-Astrid/cbt-helper/internal/presentation/tgbot/common"
-	"github.com/M-Astrid/cbt-helper/internal/presentation/tgbot/steps"
+	"github.com/M-Astrid/cbt-helper/internal/infrastructure/tgbot/common"
+	"github.com/M-Astrid/cbt-helper/internal/infrastructure/tgbot/steps"
 	"github.com/joho/godotenv"
 	tb_cal "github.com/oramaz/telebot-calendar"
 	"gopkg.in/telebot.v3"
@@ -97,8 +100,20 @@ func registerHandlers(bot *telebot.Bot, ctx context.Context, config *BotConfig) 
 		return handleSaveSMER(c, ctx, config)
 	})
 
+	// Обработка "Удалить"
+	bot.Handle(&telebot.InlineButton{Unique: "del_smer"}, func(c telebot.Context) error {
+		return handleDeleteSMER(c, config)
+	})
+	bot.Handle(&telebot.InlineButton{Unique: "del_smer_for_sure"}, func(c telebot.Context) error {
+		return handleDeleteSMERForSure(c, config)
+	})
+
 	bot.Handle(&getSMERsPDFBtn, func(c telebot.Context) error {
 		return handleDownloadSMER(c)
+	})
+
+	bot.Handle(&getShortSMERsBtn, func(c telebot.Context) error {
+		return handleGetSMERs(c)
 	})
 
 	// Обработка выгрузки по периоду
@@ -189,10 +204,10 @@ func registerPeriodHandlers(bot *telebot.Bot, ctx context.Context, config *BotCo
 	aWeekAgo := time.Now().AddDate(0, -7, 0)
 
 	bot.Handle(&telebot.InlineButton{Unique: "get_short_last_week", Text: ""}, func(c telebot.Context) error {
-		return handlePeriodPDF(c, ctx, config, toDayStart(aWeekAgo), time.Now(), "smer.pdf")
+		return sendSMERSInMessages(c, toDayStart(aWeekAgo), time.Now(), config)
 	})
 	bot.Handle(&telebot.InlineButton{Unique: "get_short_last_month", Text: ""}, func(c telebot.Context) error {
-		return handlePeriodPDF(c, ctx, config, toDayStart(aMonthAgo), time.Now(), "smer.pdf")
+		return sendSMERSInMessages(c, toDayStart(aMonthAgo), time.Now(), config)
 	})
 	bot.Handle(&telebot.InlineButton{Unique: "get_doc_last_week", Text: ""}, func(c telebot.Context) error {
 		return handlePeriodPDF(c, ctx, config, toDayStart(aWeekAgo), time.Now(), "smer.pdf")
@@ -205,6 +220,15 @@ func registerPeriodHandlers(bot *telebot.Bot, ctx context.Context, config *BotCo
 		userID := c.Sender().ID
 		state := getUserState(userID, config)
 		state.Status = common.PICK_DOC_DATE_FROM_STATUS
+		config.UserStates[8403079291] = state // todo: find out why calendar set this id to user
+		return c.Send("Выберите дату начала", &telebot.ReplyMarkup{
+			InlineKeyboard: config.Calendar.GetKeyboard(),
+		})
+	})
+	bot.Handle(&telebot.InlineButton{Unique: "get_short_custom_dates", Text: ""}, func(c telebot.Context) error {
+		userID := c.Sender().ID
+		state := getUserState(userID, config)
+		state.Status = common.PICK_SHORT_DATE_FROM_STATUS
 		config.UserStates[8403079291] = state // todo: find out why calendar set this id to user
 		return c.Send("Выберите дату начала", &telebot.ReplyMarkup{
 			InlineKeyboard: config.Calendar.GetKeyboard(),
@@ -281,6 +305,7 @@ func handleDateSelection(c telebot.Context, state *steps.UserState, config *BotC
 		}
 		state.StartDate = date
 		state.Status = common.PICK_SHORT_DATE_TO_STATUS
+		config.UserStates[c.Sender().ID] = *state
 		return c.Send("Выберите дату окончания", &telebot.ReplyMarkup{
 			InlineKeyboard: config.Calendar.GetKeyboard(),
 		})
@@ -291,7 +316,7 @@ func handleDateSelection(c telebot.Context, state *steps.UserState, config *BotC
 		}
 		state.EndDate = date
 		config.UserStates[c.Sender().ID] = *state
-		return generateAndSendPDF(c, c.Sender().ID, *state, config)
+		return sendSMERSInMessages(c, state.StartDate, state.EndDate, config)
 	case common.PICK_DOC_DATE_FROM_STATUS:
 		date, err := parseDate(c.Data())
 		if err != nil {
@@ -343,6 +368,95 @@ func generateAndSendPDF(c telebot.Context, userID int64, state steps.UserState, 
 	return c.Send(doc)
 }
 
+func sendSMERSInMessages(c telebot.Context, from, to time.Time, config *BotConfig) error {
+	adapter, err := storage.NewSMERStorage(config.DBUri, config.DBName)
+	if err != nil {
+		log.Println("Ошибка подключения к MongoDB:", err)
+		return c.Send(fmt.Sprintf("Произошла ошибка: %v", err))
+	}
+	defer adapter.Close(context.Background())
+
+	i := getUserSMERsUsecase.NewInteractor(adapter)
+	smers, err := i.Call(context.Background(), c.Sender().ID, from, to)
+	if err != nil {
+		return c.Send(fmt.Sprintf("Ошибка получения данных: %s", err))
+	}
+
+	rnd := renderer.NewSmerRenderer()
+	for _, s := range smers {
+		message, err := rnd.RenderShortSingle(s)
+		if err != nil {
+			log.Fatal(err)
+		}
+		err = c.Send(*message, &telebot.SendOptions{
+			ReplyMarkup: &telebot.ReplyMarkup{
+				InlineKeyboard: [][]telebot.InlineButton{
+					{telebot.InlineButton{
+						Unique: "del_smer",
+						Text:   "Удалить",
+						Data:   fmt.Sprintf("smer_id:%s", s.ID)}},
+				},
+			},
+			ParseMode: telebot.ModeHTML,
+		})
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+	return nil
+}
+
+func handleDeleteSMER(c telebot.Context, config *BotConfig) error {
+	adapter, err := storage.NewSMERStorage(config.DBUri, config.DBName)
+	if err != nil {
+		log.Println("Ошибка подключения к MongoDB:", err)
+		return c.Send(fmt.Sprintf("Произошла ошибка: %v", err))
+	}
+	defer adapter.Close(context.Background())
+
+	smerId := strings.Split(c.Data(), ":")[1]
+	i := getSingleSMERUsecase.NewInteractor(adapter)
+	s, err := i.Call(context.Background(), smerId)
+	if err != nil {
+		return c.Send(fmt.Sprintf("Ошибка получения данных: %s", err))
+	}
+
+	rnd := renderer.NewSmerRenderer()
+	smerRepr, err := rnd.RenderShortSingle(s)
+	if err != nil {
+		return c.Send(fmt.Sprintf("Произошла ошибка %s", err))
+	}
+	message := fmt.Sprintf("Удалить эту запись без возможности восстановления?\n\n%s", *smerRepr)
+	return c.Send(message, &telebot.SendOptions{
+		ReplyMarkup: &telebot.ReplyMarkup{
+			InlineKeyboard: [][]telebot.InlineButton{
+				{telebot.InlineButton{
+					Unique: "del_smer_for_sure",
+					Text:   "Да",
+					Data:   fmt.Sprintf("smer_id:%s", s.ID)}},
+			},
+		},
+		ParseMode: telebot.ModeHTML,
+	})
+}
+
+func handleDeleteSMERForSure(c telebot.Context, config *BotConfig) error {
+	adapter, err := storage.NewSMERStorage(config.DBUri, config.DBName)
+	if err != nil {
+		log.Println("Ошибка подключения к MongoDB:", err)
+		return c.Send(fmt.Sprintf("Произошла ошибка: %v", err))
+	}
+	defer adapter.Close(context.Background())
+
+	smerId := strings.Split(c.Data(), ":")[1]
+	i := deleteSMERUsecase.NewInteractor(adapter)
+	err = i.Call(context.Background(), smerId)
+	if err != nil {
+		return c.Send(fmt.Sprintf("Ошибка удаления данных: %s", err))
+	}
+	return c.Send(fmt.Sprintf("Запись удалена"))
+}
+
 func handleDownloadSMER(c telebot.Context) error {
 	getDocLastWeekBtn := telebot.InlineButton{Unique: "get_doc_last_week", Text: "Последняя неделя"}
 	//getDocLast2WeeksBtn := telebot.InlineButton{Unique: "get_doc_last_2_weeks", Text: "Последние две недели"}
@@ -352,6 +466,21 @@ func handleDownloadSMER(c telebot.Context) error {
 	inlineKeyboard := [][]telebot.InlineButton{
 		{getDocLastWeekBtn, getDocLastMonthBtn},
 		{getDocCustomDatesBtn},
+	}
+	return c.Send("За какой период нужна выгрузка?", &telebot.ReplyMarkup{
+		InlineKeyboard: inlineKeyboard,
+	})
+}
+
+func handleGetSMERs(c telebot.Context) error {
+	getShortLastWeekBtn := telebot.InlineButton{Unique: "get_short_last_week", Text: "Последняя неделя"}
+	//getShortLast2WeeksBtn := telebot.InlineButton{Unique: "get_short_last_2_weeks", Text: "Последние две недели"}
+	getShortLastMonthBtn := telebot.InlineButton{Unique: "get_short_last_month", Text: "Последний месяц"}
+	getShortCustomDatesBtn := telebot.InlineButton{Unique: "get_short_custom_dates", Text: "Выбрать даты"}
+
+	inlineKeyboard := [][]telebot.InlineButton{
+		{getShortLastWeekBtn, getShortLastMonthBtn},
+		{getShortCustomDatesBtn},
 	}
 	return c.Send("За какой период нужна выгрузка?", &telebot.ReplyMarkup{
 		InlineKeyboard: inlineKeyboard,

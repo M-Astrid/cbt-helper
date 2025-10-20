@@ -7,13 +7,14 @@ import (
 )
 
 type SMEREntry struct {
-	ID          string
-	UserID      int64
-	CreatedTime time.Time
-	UpdatedTime time.Time
-	Trigger     *Trigger
-	Emotions    []*Emotion
-	Thoughts    []*Thought
+	ID           string
+	UserID       int64
+	CreatedTime  time.Time
+	UpdatedTime  time.Time
+	Trigger      *Trigger
+	Emotions     []*Emotion
+	Thoughts     []*Thought
+	Unstructured *Unstructured
 }
 
 func NewSMEREntry(userID int64) *SMEREntry {
