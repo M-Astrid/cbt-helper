@@ -1,4 +1,4 @@
-package steps
+package smer_steps
 
 import (
 	"time"

@@ -1,4 +1,4 @@
-package steps
+package smer_steps
 
 import (
 	"github.com/M-Astrid/cbt-helper/internal/domain/entity"

@@ -5,6 +5,7 @@ import (
 	"log"
 	"time"
 
+	"github.com/M-Astrid/cbt-helper/internal/app/port"
 	"github.com/M-Astrid/cbt-helper/internal/domain/entity"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -31,14 +32,15 @@ import (
 //}
 
 type SMEREntry struct {
-	ID          string            `bson:"_id,omitempty"`
-	UserID      int64             `bson:"user_id"`
-	CreatedTime time.Time         `bson:"created_time"`
-	UpdatedTime time.Time         `bson:"updated_time"`
-	Emotions    []*entity.Emotion `bson:"emotions"`
-	Thoughts    []*entity.Thought `bson:"thoughts"`
-	Action      *entity.Action    `bson:"action"`
-	Trigger     *entity.Trigger   `bson:"trigger"`
+	ID           string               `bson:"_id,omitempty"`
+	UserID       int64                `bson:"user_id"`
+	CreatedTime  time.Time            `bson:"created_time"`
+	UpdatedTime  time.Time            `bson:"updated_time"`
+	Emotions     []*entity.Emotion    `bson:"emotions"`
+	Thoughts     []*entity.Thought    `bson:"thoughts"`
+	Action       *entity.Action       `bson:"action"`
+	Trigger      *entity.Trigger      `bson:"trigger"`
+	Unstructured *entity.Unstructured `bson:"unstructured"`
 }
 
 type SMERStorage struct {
@@ -46,7 +48,7 @@ type SMERStorage struct {
 	smerCollection *mongo.Collection
 }
 
-func NewSMERStorage(uri, dbName string) (*SMERStorage, error) {
+func NewSMERStorage(uri, dbName string) (port.SMERStorage, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -62,11 +64,12 @@ func NewSMERStorage(uri, dbName string) (*SMERStorage, error) {
 	}
 
 	collection := client.Database(dbName).Collection("smer_entry")
-
-	return &SMERStorage{
+	var adapter = &SMERStorage{
 		client:         client,
 		smerCollection: collection,
-	}, nil
+	}
+
+	return adapter, nil
 }
 
 func (adapter *SMERStorage) Save(ctx context.Context, entry *entity.SMEREntry) error {
@@ -84,6 +87,7 @@ func (adapter *SMERStorage) Save(ctx context.Context, entry *entity.SMEREntry) e
 		Emotions:    entry.Emotions,
 		Thoughts:    entry.Thoughts,
 		//Action:      entry.Action,
+		Unstructured: entry.Unstructured,
 	}
 	//for _, em := range entry.Emotions {
 	//	db_entry.Emotions = append(db_entry.Emotions, Emotion{em.Name, em.Scale})
@@ -94,12 +98,12 @@ func (adapter *SMERStorage) Save(ctx context.Context, entry *entity.SMEREntry) e
 	//if entry.Action != nil {
 	//	db_entry.Action = &Action{entry.Action.Description}
 	//}
-
-	filter := bson.M{"_id": db_entry.ID}
+	id_, err := primitive.ObjectIDFromHex(db_entry.ID)
+	filter := bson.M{"_id": id_}
 	update := bson.M{"$set": db_entry}
 	opts := options.Update().SetUpsert(true)
 
-	_, err := adapter.smerCollection.UpdateOne(ctx, filter, update, opts)
+	_, err = adapter.smerCollection.UpdateOne(ctx, filter, update, opts)
 	return err
 }
 
