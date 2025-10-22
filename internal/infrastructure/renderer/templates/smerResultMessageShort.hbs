@@ -13,5 +13,8 @@
 <b>Мысли:</b>
 {{#each entry.Thoughts}}
   - {{Description}}
-{{/each}}
+{{/each}}{{#if entry.Unstructured}}
+### Анализ ###
+{{ entry.Unstructured.Text }}
+{{/if}}
 {{/if}}

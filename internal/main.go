@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/M-Astrid/cbt-helper/internal/app/usecases/analizeSMER"
 	deleteSMERUsecase "github.com/M-Astrid/cbt-helper/internal/app/usecases/deleteSMER"
 	getSingleSMERUsecase "github.com/M-Astrid/cbt-helper/internal/app/usecases/getSingleSMER"
 	getUserSMERsUsecase "github.com/M-Astrid/cbt-helper/internal/app/usecases/getUserSMERs"
@@ -62,13 +63,19 @@ func main() {
 
 	config.Calendar = tb_cal.NewCalendar(bot, tb_cal.Options{})
 
+	smerStorage, err := storage.NewSMERStorage(config.DBUri, config.DBName)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer smerStorage.Close(ctx)
+
 	// Регистрация обработчиков
-	registerHandlers(bot, ctx, config)
+	registerHandlers(bot, ctx, config, smerStorage)
 
 	bot.Start()
 }
 
-func registerHandlers(bot *telebot.Bot, ctx context.Context, config *BotConfig) {
+func registerHandlers(bot *telebot.Bot, ctx context.Context, config *BotConfig, smerStorage *storage.SMERStorage) {
 	writeSMERBtn := telebot.InlineButton{Unique: "write_smer", Text: "Сделать запись СМЭР"}
 	braindumpBtn := telebot.InlineButton{Unique: "brain_dump", Text: "Записать неструктурированные мысли"}
 	getShortSMERsBtn := telebot.InlineButton{Unique: "get_short_smers", Text: "Просмотреть записи СМЭР"}
@@ -92,12 +99,17 @@ func registerHandlers(bot *telebot.Bot, ctx context.Context, config *BotConfig) 
 
 	// Обработка текстовых сообщений
 	bot.Handle(telebot.OnText, func(c telebot.Context) error {
-		return handleTextInput(c, ctx, config)
+		return handleTextInput(c, ctx, config, smerStorage)
 	})
 
 	// Обработка "Сохранить"
 	bot.Handle(&telebot.InlineButton{Unique: "save_smer"}, func(c telebot.Context) error {
 		return handleSaveSMER(c, ctx, config)
+	})
+
+	// Обработка "Работать с мыслью"
+	bot.Handle(&telebot.InlineButton{Unique: "work_smer"}, func(c telebot.Context) error {
+		return handleWorkSMER(c, config)
 	})
 
 	// Обработка "Удалить"
@@ -135,7 +147,7 @@ func handleWriteSMER(c telebot.Context, config *BotConfig) error {
 	return nil
 }
 
-func handleTextInput(c telebot.Context, ctx context.Context, config *BotConfig) error {
+func handleTextInput(c telebot.Context, ctx context.Context, config *BotConfig, smerStorage *storage.SMERStorage) error {
 	userID := c.Sender().ID
 	state, exists := config.UserStates[userID]
 
@@ -166,6 +178,10 @@ func handleTextInput(c telebot.Context, ctx context.Context, config *BotConfig) 
 		renderAndSendSmer(c, state)
 	}
 
+	if state.Status == common.WAIT_FOR_SMER_NOTES {
+		return handleSMERNotes(c, config, ctx, analizeSMER.NewInteractor(smerStorage))
+	}
+
 	// Обработка выбора дат и выгрузки
 	err := handleDateSelection(c, &state, config)
 	return err
@@ -191,6 +207,27 @@ func handleSaveSMER(c telebot.Context, ctx context.Context, config *BotConfig) e
 		c.Send("Успешно сохранили запись.")
 	}
 	return nil
+}
+
+func handleWorkSMER(c telebot.Context, config *BotConfig) error {
+	userID := c.Sender().ID
+	state := config.UserStates[userID]
+	state.Status = common.WAIT_FOR_SMER_NOTES
+	state.WorkingSMERID = strings.Split(c.Data(), ":")[1]
+	config.UserStates[userID] = state
+	return c.Send("Проанализируйте мысли и запишите результат в свободной форме")
+}
+
+func handleSMERNotes(c telebot.Context, config *BotConfig, ctx context.Context, interactor *analizeSMER.Interactor) error {
+	msg := c.Message().Text
+	state := config.UserStates[c.Sender().ID]
+	err := interactor.Call(ctx, state.WorkingSMERID, msg)
+	state.Status = 0
+	config.UserStates[c.Sender().ID] = state
+	if err != nil {
+		c.Send(err)
+	}
+	return c.Send("Сохранили анализ")
 }
 
 func toDayStart(t time.Time) time.Time {
@@ -394,6 +431,10 @@ func sendSMERSInMessages(c telebot.Context, from, to time.Time, config *BotConfi
 					{telebot.InlineButton{
 						Unique: "del_smer",
 						Text:   "Удалить",
+						Data:   fmt.Sprintf("smer_id:%s", s.ID)}},
+					{telebot.InlineButton{
+						Unique: "work_smer",
+						Text:   "Прокомментировать",
 						Data:   fmt.Sprintf("smer_id:%s", s.ID)}},
 				},
 			},

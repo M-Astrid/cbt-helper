@@ -8,6 +8,7 @@ import (
 
 type UserState struct {
 	Status             int
+	WorkingSMERID      string
 	SMER               *entity.SMEREntry
 	SMERSteps          []StepI
 	CurrentSMERStepIdx int
