@@ -16,7 +16,7 @@ TG bot for CBT diary
   <img width="535" height="187" alt="image" src="https://github.com/user-attachments/assets/4c6efec4-6ec4-49b3-b728-9f187d4d1836" />
 
 
-
+___
 ### ✅ Todo:
 
 - SMER steps setup
