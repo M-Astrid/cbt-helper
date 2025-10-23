@@ -4,15 +4,13 @@ TG bot for CBT diary
 
 ### :sparkles: Features:
 
-- Write SMER
-- Write Braindump
+- Write SMER 
+- Write braindumps
+- AI analyze thoughts and give advice
 - Export SMERs to PDF
+- Select SMERs to hide from export
 
 ### ✅ Todo:
 
-- Select SMERs to hide from export
-- AI text parse
-- AI analyze thoughts
-- Fix cognitive distortions
 - SMER steps setup
 - Work with thought chains

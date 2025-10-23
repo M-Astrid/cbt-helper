@@ -7,10 +7,10 @@ import (
 )
 
 type Interactor struct {
-	storage port.SMERStorageI
+	storage port.SMERStorage
 }
 
-func NewInteractor(storage port.SMERStorageI) *Interactor {
+func NewInteractor(storage port.SMERStorage) *Interactor {
 	return &Interactor{
 		storage: storage,
 	}

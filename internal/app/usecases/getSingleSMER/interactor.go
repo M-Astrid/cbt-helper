@@ -8,15 +8,15 @@ import (
 )
 
 type Interactor struct {
-	storage port.SMERStorageI
+	storage port.SMERStorage
 }
 
-func NewInteractor(storage port.SMERStorageI) *Interactor {
+func NewInteractor(storage port.SMERStorage) *Interactor {
 	return &Interactor{
 		storage: storage,
 	}
 }
 
 func (i *Interactor) Call(ctx context.Context, id string) (*entity.SMEREntry, error) {
-	return i.storage.GetByID(ctx, id)
+	return i.storage.GetByID(id)
 }

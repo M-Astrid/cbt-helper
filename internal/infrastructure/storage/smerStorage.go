@@ -106,7 +106,10 @@ func (adapter *SMERStorage) Save(ctx context.Context, entry *entity.SMEREntry) e
 	return err
 }
 
-func (adapter *SMERStorage) GetByID(ctx context.Context, id string) (*entity.SMEREntry, error) {
+func (adapter *SMERStorage) GetByID(id string) (*entity.SMEREntry, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
 	id_, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
 		return nil, err

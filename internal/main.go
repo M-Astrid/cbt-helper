@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/M-Astrid/cbt-helper/internal/app/usecases/addNotesSMER"
 	"github.com/M-Astrid/cbt-helper/internal/app/usecases/analizeSMER"
 	deleteSMERUsecase "github.com/M-Astrid/cbt-helper/internal/app/usecases/deleteSMER"
 	getSingleSMERUsecase "github.com/M-Astrid/cbt-helper/internal/app/usecases/getSingleSMER"
@@ -17,6 +18,8 @@ import (
 	saveSMERUsecase "github.com/M-Astrid/cbt-helper/internal/app/usecases/saveSMER"
 	"github.com/M-Astrid/cbt-helper/internal/domain/entity"
 	domainError "github.com/M-Astrid/cbt-helper/internal/domain/error"
+	"github.com/M-Astrid/cbt-helper/internal/infrastructure/http/ai_client"
+	"github.com/M-Astrid/cbt-helper/internal/infrastructure/http/http_client"
 	"github.com/M-Astrid/cbt-helper/internal/infrastructure/renderer"
 	"github.com/M-Astrid/cbt-helper/internal/infrastructure/storage"
 	"github.com/M-Astrid/cbt-helper/internal/infrastructure/tgbot/common"
@@ -69,13 +72,26 @@ func main() {
 	}
 	defer smerStorage.Close(ctx)
 
+	deepSeekAdapter := ai_client.NewDeepSeekAdapter(
+		os.Getenv("DEEPSEEK_API_KEY"),
+		http_client.NewHttpClient(),
+		"https://api.deepseek.com",
+	)
+
 	// Регистрация обработчиков
-	registerHandlers(bot, ctx, config, smerStorage)
+	registerHandlers(bot, ctx, config, smerStorage, deepSeekAdapter)
 
 	bot.Start()
 }
 
-func registerHandlers(bot *telebot.Bot, ctx context.Context, config *BotConfig, smerStorage *storage.SMERStorage) {
+func registerHandlers(
+	bot *telebot.Bot,
+	ctx context.Context,
+	config *BotConfig,
+	smerStorage *storage.SMERStorage,
+	deepSeekAdapter *ai_client.DeepSeekAdapter,
+) {
+
 	writeSMERBtn := telebot.InlineButton{Unique: "write_smer", Text: "Сделать запись СМЭР"}
 	braindumpBtn := telebot.InlineButton{Unique: "brain_dump", Text: "Записать неструктурированные мысли"}
 	getShortSMERsBtn := telebot.InlineButton{Unique: "get_short_smers", Text: "Просмотреть записи СМЭР"}
@@ -92,9 +108,25 @@ func registerHandlers(bot *telebot.Bot, ctx context.Context, config *BotConfig, 
 		})
 	})
 
-	// Обработка кнопки "Сделать запись СМЭР"
 	bot.Handle(&writeSMERBtn, func(c telebot.Context) error {
 		return handleWriteSMER(c, config)
+	})
+	bot.Handle("/write_smer", func(c telebot.Context) error {
+		return handleWriteSMER(c, config)
+	})
+
+	bot.Handle(&getSMERsPDFBtn, func(c telebot.Context) error {
+		return handleDownloadSMER(c)
+	})
+	bot.Handle("/get_smers_pdf", func(c telebot.Context) error {
+		return handleDownloadSMER(c)
+	})
+
+	bot.Handle(&getShortSMERsBtn, func(c telebot.Context) error {
+		return handleGetSMERs(c)
+	})
+	bot.Handle("/get_smers_list", func(c telebot.Context) error {
+		return handleGetSMERs(c)
 	})
 
 	// Обработка текстовых сообщений
@@ -112,6 +144,11 @@ func registerHandlers(bot *telebot.Bot, ctx context.Context, config *BotConfig, 
 		return handleWorkSMER(c, config)
 	})
 
+	// Обработка "AI анализ СМЭР"
+	bot.Handle(&telebot.InlineButton{Unique: "analize_smer"}, func(c telebot.Context) error {
+		return handleAnalizeSMER(c, config, analizeSMER.NewInteractor(smerStorage, deepSeekAdapter))
+	})
+
 	// Обработка "Удалить"
 	bot.Handle(&telebot.InlineButton{Unique: "del_smer"}, func(c telebot.Context) error {
 		return handleDeleteSMER(c, config)
@@ -120,16 +157,18 @@ func registerHandlers(bot *telebot.Bot, ctx context.Context, config *BotConfig, 
 		return handleDeleteSMERForSure(c, config)
 	})
 
-	bot.Handle(&getSMERsPDFBtn, func(c telebot.Context) error {
-		return handleDownloadSMER(c)
-	})
-
-	bot.Handle(&getShortSMERsBtn, func(c telebot.Context) error {
-		return handleGetSMERs(c)
-	})
-
 	// Обработка выгрузки по периоду
 	registerPeriodHandlers(bot, ctx, config)
+}
+
+func handleAnalizeSMER(c telebot.Context, config *BotConfig, interactor *analizeSMER.Interactor) error {
+	res, err := interactor.Call(&analizeSMER.AnalizeSMERCmd{SMERID: strings.Split(c.Data(), ":")[1]})
+	if err != nil {
+		return c.Send(err)
+	}
+	return c.Send(res.Text, &telebot.SendOptions{
+		ParseMode: telebot.ModeMarkdown,
+	})
 }
 
 func handleWriteSMER(c telebot.Context, config *BotConfig) error {
@@ -179,7 +218,7 @@ func handleTextInput(c telebot.Context, ctx context.Context, config *BotConfig, 
 	}
 
 	if state.Status == common.WAIT_FOR_SMER_NOTES {
-		return handleSMERNotes(c, config, ctx, analizeSMER.NewInteractor(smerStorage))
+		return handleSMERNotes(c, config, ctx, addNotesSMER.NewInteractor(smerStorage))
 	}
 
 	// Обработка выбора дат и выгрузки
@@ -215,11 +254,16 @@ func handleWorkSMER(c telebot.Context, config *BotConfig) error {
 	state.Status = common.WAIT_FOR_SMER_NOTES
 	state.WorkingSMERID = strings.Split(c.Data(), ":")[1]
 	config.UserStates[userID] = state
-	return c.Send("Проанализируйте мысли и запишите результат в свободной форме")
+	return c.Send("Проанализируйте мысли и запишите результат в свободной форме. " +
+		"Чтобы удалить анализ, отправьте '-'.")
+
 }
 
-func handleSMERNotes(c telebot.Context, config *BotConfig, ctx context.Context, interactor *analizeSMER.Interactor) error {
-	msg := c.Message().Text
+func handleSMERNotes(c telebot.Context, config *BotConfig, ctx context.Context, interactor *addNotesSMER.Interactor) error {
+	msg := &c.Message().Text
+	if *msg == "-" {
+		msg = nil
+	}
 	state := config.UserStates[c.Sender().ID]
 	err := interactor.Call(ctx, state.WorkingSMERID, msg)
 	state.Status = 0
@@ -432,10 +476,17 @@ func sendSMERSInMessages(c telebot.Context, from, to time.Time, config *BotConfi
 						Unique: "del_smer",
 						Text:   "Удалить",
 						Data:   fmt.Sprintf("smer_id:%s", s.ID)}},
-					{telebot.InlineButton{
-						Unique: "work_smer",
-						Text:   "Прокомментировать",
-						Data:   fmt.Sprintf("smer_id:%s", s.ID)}},
+					{
+						telebot.InlineButton{
+							Unique: "work_smer",
+							Text:   "Самостоятельная работа",
+							Data:   fmt.Sprintf("smer_id:%s", s.ID),
+						},
+						telebot.InlineButton{
+							Unique: "analize_smer",
+							Text:   "AI анализ",
+							Data:   fmt.Sprintf("smer_id:%s", s.ID)},
+					},
 				},
 			},
 			ParseMode: telebot.ModeHTML,
@@ -508,7 +559,7 @@ func handleDownloadSMER(c telebot.Context) error {
 		{getDocLastWeekBtn, getDocLastMonthBtn},
 		{getDocCustomDatesBtn},
 	}
-	return c.Send("За какой период нужна выгрузка?", &telebot.ReplyMarkup{
+	return c.Send("За какой период нужны выгрузка?", &telebot.ReplyMarkup{
 		InlineKeyboard: inlineKeyboard,
 	})
 }
@@ -523,7 +574,7 @@ func handleGetSMERs(c telebot.Context) error {
 		{getShortLastWeekBtn, getShortLastMonthBtn},
 		{getShortCustomDatesBtn},
 	}
-	return c.Send("За какой период нужна выгрузка?", &telebot.ReplyMarkup{
+	return c.Send("За какой период нужны записи?", &telebot.ReplyMarkup{
 		InlineKeyboard: inlineKeyboard,
 	})
 }
