@@ -31,7 +31,7 @@ import (
 //}
 
 type SMEREntry struct {
-	ID           string               `bson:"_id,omitempty"`
+	ID           primitive.ObjectID   `bson:"_id,omitempty"`
 	UserID       int64                `bson:"user_id"`
 	CreatedTime  time.Time            `bson:"created_time"`
 	UpdatedTime  time.Time            `bson:"updated_time"`
@@ -77,9 +77,16 @@ func (adapter *SMERStorage) Save(ctx context.Context, entry *entity.SMEREntry) e
 	}
 	entry.UpdatedTime = now
 
+	if entry.ID == "" {
+		entry.ID = primitive.NewObjectID().Hex()
+	}
 	id_, err := primitive.ObjectIDFromHex(entry.ID)
+	if err != nil {
+		return err
+	}
 
 	db_entry := SMEREntry{
+		ID:           id_,
 		UserID:       entry.UserID,
 		CreatedTime:  entry.CreatedTime,
 		UpdatedTime:  entry.UpdatedTime,
@@ -88,15 +95,6 @@ func (adapter *SMERStorage) Save(ctx context.Context, entry *entity.SMEREntry) e
 		Thoughts:     entry.Thoughts,
 		Unstructured: entry.Unstructured,
 	}
-	//for _, em := range entry.Emotions {
-	//	db_entry.Emotions = append(db_entry.Emotions, Emotion{em.Name, em.Scale})
-	//}
-	//for _, th := range entry.Thoughts {
-	//	db_entry.Thoughts = append(db_entry.Thoughts, Thought{th.Description})
-	//}
-	//if entry.Action != nil {
-	//	db_entry.Action = &Action{entry.Action.Description}
-	//}
 
 	filter := bson.M{"_id": id_}
 	update := bson.M{"$set": db_entry}
@@ -119,7 +117,7 @@ func (adapter *SMERStorage) GetByID(id string) (*entity.SMEREntry, error) {
 	var entry SMEREntry
 	err = res.Decode(&entry)
 	return &entity.SMEREntry{
-		ID:          entry.ID,
+		ID:          entry.ID.Hex(),
 		UserID:      entry.UserID,
 		CreatedTime: entry.CreatedTime,
 		UpdatedTime: entry.UpdatedTime,
@@ -162,7 +160,7 @@ func (adapter *SMERStorage) GetByUserID(ctx context.Context, id int64, startDate
 	res := make([]*entity.SMEREntry, len(entries))
 	for i, entry := range entries {
 		res[i] = &entity.SMEREntry{
-			ID:           entry.ID,
+			ID:           entry.ID.Hex(),
 			UserID:       entry.UserID,
 			CreatedTime:  entry.CreatedTime,
 			UpdatedTime:  entry.UpdatedTime,
@@ -170,19 +168,7 @@ func (adapter *SMERStorage) GetByUserID(ctx context.Context, id int64, startDate
 			Emotions:     entry.Emotions,
 			Thoughts:     entry.Thoughts,
 			Unstructured: entry.Unstructured,
-			//Action:      entry.Action,
 		}
-		//for _, em := range entry.Emotions {
-		//	res[i].Emotions = append(res[i].Emotions, &entity.Emotion{
-		//		Name:  em.Name,
-		//		Scale: em.Scale,
-		//	})
-		//}
-		//for _, th := range entry.Thoughts {
-		//	res[i].Thoughts = append(res[i].Thoughts, &entity.Thought{
-		//		Description: th.Description,
-		//	})
-		//}
 	}
 
 	return res, nil

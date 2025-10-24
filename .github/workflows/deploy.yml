@@ -1,0 +1,36 @@
+name: Deploy Telegram Bot
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+
+      - name: SSH to server and deploy
+        uses: appleboy/ssh-action@v0.1.4
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_PRIVATE_KEY }}
+          script: |
+            export TELEGRAM_BOT_TOKEN=${{ secrets.TELEGRAM_BOT_TOKEN }}
+  
+            export MONGODB_USER=${{ secrets.MONGODB_USER }}
+            export MONGODB_PASSWORD=${{ secrets.MONGODB_PASSWORD }}
+            export MONGODB_HOST=mongo
+            export MONGODB_PORT=27017
+            export MONGODB_DB=cbt-bot
+            export DEEPSEEK_API_KEY=${{ secrets.DEEPSEEK_API_KEY }}
+            
+            docker-compose pull
+            docker-compose up --build -d 

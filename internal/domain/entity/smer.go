@@ -2,8 +2,6 @@ package entity
 
 import (
 	"time"
-
-	"github.com/google/uuid"
 )
 
 type SMEREntry struct {
@@ -19,7 +17,7 @@ type SMEREntry struct {
 
 func NewSMEREntry(userID int64) *SMEREntry {
 	return &SMEREntry{
-		ID:          uuid.New().String(),
+		ID:          "",
 		UserID:      userID,
 		CreatedTime: time.Now(),
 		UpdatedTime: time.Now(),

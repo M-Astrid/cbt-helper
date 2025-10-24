@@ -1,27 +1,27 @@
-version: '3.8'
-
 services:
-  mongo-ui:
-    image: mongo-express
-    restart: always
-    depends_on:
-      - mongo
-    environment:
-      ME_CONFIG_BASICAUTH_USERNAME: ${MONGO_USER}
-      ME_CONFIG_BASICAUTH_PASSWORD: ${MONGO_PASSWORD}
-      ME_CONFIG_MONGODB_SERVER: mongo
-      ME_CONFIG_MONGODB_ADMINUSERNAME: ${MONGO_USER}
-      ME_CONFIG_MONGODB_ADMINPASSWORD: ${MONGO_PASSWORD}
-    ports:
-      - "8081:8081"
-    env_file:
-      - .env
+#  mongo-ui:
+#    image: mongo-express
+#    restart: always
+#    depends_on:
+#      - mongo
+#    environment:
+#      ME_CONFIG_BASICAUTH_USERNAME: ${MONGO_USER}
+#      ME_CONFIG_BASICAUTH_PASSWORD: ${MONGO_PASSWORD}
+#      ME_CONFIG_MONGODB_SERVER: mongo
+#      ME_CONFIG_MONGODB_ADMINUSERNAME: ${MONGO_USER}
+#      ME_CONFIG_MONGODB_ADMINPASSWORD: ${MONGO_PASSWORD}
+#    ports:
+#      - "8081:8081"
+#    env_file:
+#      - .env
 
   mongo:
     image: mongo:8.0.15
+    env_file:
+      - .env
     environment:
-      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER}
-      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD}
+      MONGO_INITDB_ROOT_USERNAME: ${MONGODB_USER}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGODB_PASSWORD}
       MONGO_INITDB_DATABASE: ${MONGODB_DB}
     container_name: mongo
     restart: always
@@ -29,13 +29,10 @@ services:
       - "27017:27017"
     volumes:
       - mongo_data:/data/db
-    env_file:
-      - .env
 
   bot:
     build:
-      context: ./internal
-      dockerfile: Dockerfile
+      context: .
     container_name: bot
     restart: always
     env_file:

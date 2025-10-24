@@ -14,3 +14,6 @@ TG bot for CBT diary
 
 - SMER steps setup
 - Work with thought chains
+
+- fix only one note in mongo after writing analizys
+- fix install wkhtmltopdf
