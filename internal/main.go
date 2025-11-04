@@ -41,7 +41,7 @@ type BotConfig struct {
 func main() {
 	// Загрузка переменных окружения
 	if err := godotenv.Load(); err != nil {
-		log.Fatalf("Ошибка загрузки файла .env: %v", err)
+		log.Println("Не найден файл .env: %v", err)
 	}
 
 	ctx := context.Background()

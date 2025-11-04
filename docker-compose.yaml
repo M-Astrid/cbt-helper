@@ -17,8 +17,6 @@ services:
 
   mongo:
     image: mongo:8.0.15
-    env_file:
-      - .env
     environment:
       MONGO_INITDB_ROOT_USERNAME: ${MONGODB_USER}
       MONGO_INITDB_ROOT_PASSWORD: ${MONGODB_PASSWORD}
@@ -35,8 +33,6 @@ services:
       context: .
     container_name: bot
     restart: always
-    env_file:
-      - .env
 
 volumes:
   mongo_data:
