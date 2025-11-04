@@ -33,7 +33,7 @@ jobs:
           username: ${{ secrets.SERVER_USER }}
           password: ${{ secrets.SERVER_PASSWORD }}
           script: |
-            cd ~/cbt-helper
+            cd /root/~/cbt-helper
             export TELEGRAM_BOT_TOKEN=${{ secrets.TELEGRAM_BOT_TOKEN }}
   
             export MONGODB_USER=${{ secrets.MONGODB_USER }}
