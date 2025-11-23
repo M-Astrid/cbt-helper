@@ -33,5 +33,7 @@ func (i *Interactor) Call(ctx context.Context, id string, notes *string) error {
 		s.Unstructured = entity.NewUnstructured(*notes)
 	}
 
-	return i.storage.Save(ctx, s)
+	_, err = i.storage.Save(ctx, s)
+
+	return err
 }
