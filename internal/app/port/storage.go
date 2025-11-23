@@ -8,7 +8,7 @@ import (
 )
 
 type SMERStorage interface {
-	Save(ctx context.Context, entry *entity.SMEREntry) error
+	Save(ctx context.Context, entry *entity.SMEREntry) (*entity.SMEREntry, error)
 	GetByUserID(ctx context.Context, id int64, startDate time.Time, endDate time.Time) ([]*entity.SMEREntry, error)
 	GetByID(id string) (*entity.SMEREntry, error)
 	DeleteByID(ctx context.Context, id string) error

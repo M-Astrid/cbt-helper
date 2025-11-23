@@ -70,7 +70,7 @@ func NewSMERStorage(uri, dbName string) (*SMERStorage, error) {
 	}, nil
 }
 
-func (adapter *SMERStorage) Save(ctx context.Context, entry *entity.SMEREntry) error {
+func (adapter *SMERStorage) Save(ctx context.Context, entry *entity.SMEREntry) (*entity.SMEREntry, error) {
 	now := time.Now()
 	if entry.CreatedTime.IsZero() {
 		entry.CreatedTime = now
@@ -82,7 +82,7 @@ func (adapter *SMERStorage) Save(ctx context.Context, entry *entity.SMEREntry) e
 	}
 	id_, err := primitive.ObjectIDFromHex(entry.ID)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	db_entry := SMEREntry{
@@ -101,7 +101,7 @@ func (adapter *SMERStorage) Save(ctx context.Context, entry *entity.SMEREntry) e
 	opts := options.Update().SetUpsert(true)
 
 	_, err = adapter.smerCollection.UpdateOne(ctx, filter, update, opts)
-	return err
+	return entry, err
 }
 
 func (adapter *SMERStorage) GetByID(id string) (*entity.SMEREntry, error) {

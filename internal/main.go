@@ -115,19 +115,20 @@ func registerHandlers(
 		return handleWriteSMER(c, config)
 	})
 
-	bot.Handle(&getSMERsPDFBtn, func(c telebot.Context) error {
-		return handleDownloadSMER(c)
-	})
-	bot.Handle("/get_smers_pdf", func(c telebot.Context) error {
-		return handleDownloadSMER(c)
-	})
-
 	bot.Handle(&getShortSMERsBtn, func(c telebot.Context) error {
 		return handleGetSMERs(c)
 	})
-	bot.Handle("/get_smers_list", func(c telebot.Context) error {
-		return handleGetSMERs(c)
-	})
+
+	//bot.Handle(&getSMERsPDFBtn, func(c telebot.Context) error {
+	//	return handleDownloadSMER(c)
+	//})
+	//bot.Handle("/get_smers_pdf", func(c telebot.Context) error {
+	//	return handleDownloadSMER(c)
+	//})
+
+	//bot.Handle("/get_smers_list", func(c telebot.Context) error {
+	//	return handleGetSMERs(c)
+	//})
 
 	// Обработка текстовых сообщений
 	bot.Handle(telebot.OnText, func(c telebot.Context) error {
@@ -240,10 +241,38 @@ func handleSaveSMER(c telebot.Context, ctx context.Context, config *BotConfig) e
 	defer adapter.Close(ctx)
 
 	i := saveSMERUsecase.NewInteractor(adapter)
-	if err := i.Call(ctx, state.SMER); err != nil {
+	if s, err := i.Call(ctx, state.SMER); err != nil {
 		c.Send(fmt.Sprintf("Произошла ошибка: %s", err))
 	} else {
-		c.Send("Успешно сохранили запись.")
+		c.Reply("Успешно сохранили запись.")
+
+		rnd := renderer.NewSmerRenderer()
+		msg, err := rnd.RenderMessageSingle(state.SMER)
+		if err != nil {
+			return c.Send(fmt.Sprintf("Произошла ошибка: %s", err))
+		}
+		c.Edit(fmt.Sprintf("%s", *msg), &telebot.SendOptions{
+			ReplyMarkup: &telebot.ReplyMarkup{
+				InlineKeyboard: [][]telebot.InlineButton{
+					{telebot.InlineButton{
+						Unique: "del_smer",
+						Text:   "Удалить",
+						Data:   fmt.Sprintf("smer_id:%s", s.ID)}},
+					{
+						telebot.InlineButton{
+							Unique: "work_smer",
+							Text:   "Самостоятельная работа",
+							Data:   fmt.Sprintf("smer_id:%s", s.ID),
+						},
+						telebot.InlineButton{
+							Unique: "analize_smer",
+							Text:   "AI анализ",
+							Data:   fmt.Sprintf("smer_id:%s", s.ID)},
+					},
+				},
+			},
+			ParseMode: telebot.ModeHTML,
+		})
 	}
 	return nil
 }
@@ -283,6 +312,7 @@ func registerPeriodHandlers(bot *telebot.Bot, ctx context.Context, config *BotCo
 	// tommorow := time.Now().AddDate(0, 0, 1)
 	aMonthAgo := time.Now().AddDate(0, -1, 0)
 	aWeekAgo := time.Now().AddDate(0, -7, 0)
+	aDayAgo := time.Now().AddDate(0, 0, -1)
 
 	bot.Handle(&telebot.InlineButton{Unique: "get_short_last_week", Text: ""}, func(c telebot.Context) error {
 		return sendSMERSInMessages(c, toDayStart(aWeekAgo), time.Now(), config)
@@ -290,30 +320,51 @@ func registerPeriodHandlers(bot *telebot.Bot, ctx context.Context, config *BotCo
 	bot.Handle(&telebot.InlineButton{Unique: "get_short_last_month", Text: ""}, func(c telebot.Context) error {
 		return sendSMERSInMessages(c, toDayStart(aMonthAgo), time.Now(), config)
 	})
-	bot.Handle(&telebot.InlineButton{Unique: "get_doc_last_week", Text: ""}, func(c telebot.Context) error {
-		return handlePeriodPDF(c, ctx, config, toDayStart(aWeekAgo), time.Now(), "smer.pdf")
+
+	bot.Handle("/get_short_today", func(c telebot.Context) error {
+		return sendSMERSInMessages(c, toDayStart(time.Now()), time.Now(), config)
+	})
+	bot.Handle("/get_short_last_2_days", func(c telebot.Context) error {
+		return sendSMERSInMessages(c, toDayStart(aDayAgo), time.Now(), config)
+	})
+	bot.Handle("/get_short_last_week", func(c telebot.Context) error {
+		return sendSMERSInMessages(c, toDayStart(aWeekAgo), time.Now(), config)
+	})
+	bot.Handle("/get_short_last_month", func(c telebot.Context) error {
+		return sendSMERSInMessages(c, toDayStart(aMonthAgo), time.Now(), config)
 	})
 
-	bot.Handle(&telebot.InlineButton{Unique: "get_doc_last_month", Text: ""}, func(c telebot.Context) error {
-		return handlePeriodPDF(c, ctx, config, toDayStart(aMonthAgo), time.Now(), "smer.pdf")
-	})
-	bot.Handle(&telebot.InlineButton{Unique: "get_doc_custom_dates", Text: ""}, func(c telebot.Context) error {
-		userID := c.Sender().ID
-		state := getUserState(userID, config)
-		state.Status = common.PICK_DOC_DATE_FROM_STATUS
-		config.UserStates[8403079291] = state // todo: find out why calendar set this id to user
-		return c.Send("Выберите дату начала", &telebot.ReplyMarkup{
-			InlineKeyboard: config.Calendar.GetKeyboard(),
-		})
-	})
+	//bot.Handle(&telebot.InlineButton{Unique: "get_doc_last_week", Text: ""}, func(c telebot.Context) error {
+	//	return handlePeriodPDF(c, ctx, config, toDayStart(aWeekAgo), time.Now(), "smer.pdf")
+	//})
+	//
+	//bot.Handle(&telebot.InlineButton{Unique: "get_doc_last_month", Text: ""}, func(c telebot.Context) error {
+	//	return handlePeriodPDF(c, ctx, config, toDayStart(aMonthAgo), time.Now(), "smer.pdf")
+	//})
+	//bot.Handle(&telebot.InlineButton{Unique: "get_doc_custom_dates", Text: ""}, func(c telebot.Context) error {
+	//	userID := c.Sender().ID
+	//	state := getUserState(userID, config)
+	//	state.Status = common.PICK_DOC_DATE_FROM_STATUS
+	//	config.UserStates[8403079291] = state // todo: find out why calendar set this id to user
+	//	return c.Send("Выберите дату начала", &telebot.ReplyMarkup{
+	//		InlineKeyboard: config.Calendar.GetKeyboard(),
+	//	})
+	//})
 	bot.Handle(&telebot.InlineButton{Unique: "get_short_custom_dates", Text: ""}, func(c telebot.Context) error {
-		userID := c.Sender().ID
-		state := getUserState(userID, config)
-		state.Status = common.PICK_SHORT_DATE_FROM_STATUS
-		config.UserStates[8403079291] = state // todo: find out why calendar set this id to user
-		return c.Send("Выберите дату начала", &telebot.ReplyMarkup{
-			InlineKeyboard: config.Calendar.GetKeyboard(),
-		})
+		return handleCustomDates(c, config)
+	})
+	bot.Handle("/get_short_custom_dates", func(c telebot.Context) error {
+		return handleCustomDates(c, config)
+	})
+}
+
+func handleCustomDates(c telebot.Context, config *BotConfig) error {
+	userID := c.Sender().ID
+	state := getUserState(userID, config)
+	state.Status = common.PICK_SHORT_DATE_FROM_STATUS
+	config.UserStates[8403079291] = state // todo: find out why calendar set this id to user
+	return c.Send("Выберите дату начала", &telebot.ReplyMarkup{
+		InlineKeyboard: config.Calendar.GetKeyboard(),
 	})
 }
 

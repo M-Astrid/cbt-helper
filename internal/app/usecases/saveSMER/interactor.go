@@ -17,6 +17,6 @@ func NewInteractor(storage port.SMERStorage) *Interactor {
 	}
 }
 
-func (i *Interactor) Call(ctx context.Context, smer *entity.SMEREntry) error {
+func (i *Interactor) Call(ctx context.Context, smer *entity.SMEREntry) (*entity.SMEREntry, error) {
 	return i.storage.Save(ctx, smer)
 }
