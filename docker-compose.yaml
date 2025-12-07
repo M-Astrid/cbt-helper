@@ -33,6 +33,8 @@ services:
       context: .
     container_name: bot
     restart: always
+    env_file:
+      - .env
 
 volumes:
   mongo_data:

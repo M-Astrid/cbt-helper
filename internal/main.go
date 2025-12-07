@@ -6,9 +6,11 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"math"
 	"os"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/M-Astrid/cbt-helper/internal/app/usecases/addNotesSMER"
 	"github.com/M-Astrid/cbt-helper/internal/app/usecases/analizeSMER"
@@ -36,6 +38,7 @@ type BotConfig struct {
 	Token      string
 	UserStates map[int64]steps.UserState
 	Calendar   *tb_cal.Calendar
+	MaxMsgLen  int
 }
 
 func main() {
@@ -52,6 +55,7 @@ func main() {
 		Token:      os.Getenv("TELEGRAM_BOT_TOKEN"),
 		UserStates: make(map[int64]steps.UserState),
 		Calendar:   tb_cal.NewCalendar(nil, tb_cal.Options{}),
+		MaxMsgLen:  4096,
 	}
 
 	pref := telebot.Settings{
@@ -91,6 +95,18 @@ func registerHandlers(
 	smerStorage *storage.SMERStorage,
 	deepSeekAdapter *ai_client.DeepSeekAdapter,
 ) {
+	bot.Handle(telebot.OnSticker, func(c telebot.Context) error {
+		sticker := c.Message().Sticker
+		if sticker != nil {
+			log.Println(sticker.File.UniqueID)
+			log.Println(sticker.File.FileID)
+			log.Println(sticker.File)
+			// Выводим FileID в лог или отправляем обратно
+			c.Send("FileID этого стикера: " + sticker.FileID)
+
+		}
+		return nil
+	})
 
 	writeSMERBtn := telebot.InlineButton{Unique: "write_smer", Text: "Сделать запись СМЭР"}
 	braindumpBtn := telebot.InlineButton{Unique: "brain_dump", Text: "Записать неструктурированные мысли"}
@@ -126,9 +142,9 @@ func registerHandlers(
 	//	return handleDownloadSMER(c)
 	//})
 
-	//bot.Handle("/get_smers_list", func(c telebot.Context) error {
-	//	return handleGetSMERs(c)
-	//})
+	bot.Handle("/get_smers_list", func(c telebot.Context) error {
+		return handleGetSMERs(c)
+	})
 
 	// Обработка текстовых сообщений
 	bot.Handle(telebot.OnText, func(c telebot.Context) error {
@@ -147,7 +163,7 @@ func registerHandlers(
 
 	// Обработка "AI анализ СМЭР"
 	bot.Handle(&telebot.InlineButton{Unique: "analize_smer"}, func(c telebot.Context) error {
-		return handleAnalizeSMER(c, config, analizeSMER.NewInteractor(smerStorage, deepSeekAdapter))
+		return handleAnalizeSMER(c, config, analizeSMER.NewInteractor(smerStorage, deepSeekAdapter), bot)
 	})
 
 	// Обработка "Удалить"
@@ -162,14 +178,48 @@ func registerHandlers(
 	registerPeriodHandlers(bot, ctx, config)
 }
 
-func handleAnalizeSMER(c telebot.Context, config *BotConfig, interactor *analizeSMER.Interactor) error {
+//func sendSticker(bot *telebot.Bot, chatID int64, stickerFileID string) (*telebot.Sticker, error) {
+//	stickerID := telebot.FileID(stickerFileID)
+//	sendable := telebot.Sticker(chatID, stickerID)
+//	return sendable, nil
+//}
+
+func handleAnalizeSMER(c telebot.Context, config *BotConfig, interactor *analizeSMER.Interactor, bot *telebot.Bot) error {
+	sticker := &telebot.Sticker{
+		File: telebot.File{
+			FileID: "CAACAgIAAxkBAAIHuWk1ilyLAQGRV0YlaTH-CrBP-P_DAAK0IwACmEspSN65vs0qW-TZNgQ",
+		},
+	}
+	m, _ := sticker.Send(bot, c.Recipient(), &telebot.SendOptions{})
+
 	res, err := interactor.Call(&analizeSMER.AnalizeSMERCmd{SMERID: strings.Split(c.Data(), ":")[1]})
+	bot.Delete(m)
+
 	if err != nil {
 		return c.Send(err)
 	}
-	return c.Send(res.Text, &telebot.SendOptions{
-		ParseMode: telebot.ModeMarkdown,
-	})
+
+	mxLen := config.MaxMsgLen
+	runeCount := utf8.RuneCountInString(res.Text)
+	parts := int(math.Ceil(float64(runeCount) / float64(mxLen)))
+
+	runes := []rune(res.Text)
+
+	for i := 0; i < parts; i++ {
+		start := i * mxLen
+		end := (i + 1) * mxLen
+		if end > runeCount {
+			end = runeCount
+		}
+		msgPart := string(runes[start:end])
+		err := c.Send(msgPart, &telebot.SendOptions{
+			ParseMode: telebot.ModeMarkdown,
+		})
+		if err != nil {
+			c.Send(err)
+		}
+	}
+	return nil
 }
 
 func handleWriteSMER(c telebot.Context, config *BotConfig) error {
@@ -314,23 +364,23 @@ func registerPeriodHandlers(bot *telebot.Bot, ctx context.Context, config *BotCo
 	aWeekAgo := time.Now().AddDate(0, -7, 0)
 	aDayAgo := time.Now().AddDate(0, 0, -1)
 
-	bot.Handle(&telebot.InlineButton{Unique: "get_short_last_week", Text: ""}, func(c telebot.Context) error {
+	bot.Handle(&telebot.InlineButton{Unique: "get_smers_last_week", Text: ""}, func(c telebot.Context) error {
 		return sendSMERSInMessages(c, toDayStart(aWeekAgo), time.Now(), config)
 	})
-	bot.Handle(&telebot.InlineButton{Unique: "get_short_last_month", Text: ""}, func(c telebot.Context) error {
+	bot.Handle(&telebot.InlineButton{Unique: "get_smers_last_month", Text: ""}, func(c telebot.Context) error {
 		return sendSMERSInMessages(c, toDayStart(aMonthAgo), time.Now(), config)
 	})
 
-	bot.Handle("/get_short_today", func(c telebot.Context) error {
+	bot.Handle("/get_smers_today", func(c telebot.Context) error {
 		return sendSMERSInMessages(c, toDayStart(time.Now()), time.Now(), config)
 	})
-	bot.Handle("/get_short_last_2_days", func(c telebot.Context) error {
+	bot.Handle("/get_smers_last_2_days", func(c telebot.Context) error {
 		return sendSMERSInMessages(c, toDayStart(aDayAgo), time.Now(), config)
 	})
-	bot.Handle("/get_short_last_week", func(c telebot.Context) error {
+	bot.Handle("/get_smers_last_week", func(c telebot.Context) error {
 		return sendSMERSInMessages(c, toDayStart(aWeekAgo), time.Now(), config)
 	})
-	bot.Handle("/get_short_last_month", func(c telebot.Context) error {
+	bot.Handle("/get_smers_last_month", func(c telebot.Context) error {
 		return sendSMERSInMessages(c, toDayStart(aMonthAgo), time.Now(), config)
 	})
 
@@ -350,10 +400,10 @@ func registerPeriodHandlers(bot *telebot.Bot, ctx context.Context, config *BotCo
 	//		InlineKeyboard: config.Calendar.GetKeyboard(),
 	//	})
 	//})
-	bot.Handle(&telebot.InlineButton{Unique: "get_short_custom_dates", Text: ""}, func(c telebot.Context) error {
+	bot.Handle(&telebot.InlineButton{Unique: "get_smers_custom_dates", Text: ""}, func(c telebot.Context) error {
 		return handleCustomDates(c, config)
 	})
-	bot.Handle("/get_short_custom_dates", func(c telebot.Context) error {
+	bot.Handle("/get_smers_custom_dates", func(c telebot.Context) error {
 		return handleCustomDates(c, config)
 	})
 }
