@@ -205,7 +205,7 @@ func handleAnalizeSMER(c telebot.Context, config *BotConfig, interactor *analize
 
 	runes := []rune(res.Text)
 
-	for i := 0; i < parts; i++ {
+	for i := 0; i <= parts; i++ {
 		start := i * mxLen
 		end := (i + 1) * mxLen
 		if end > runeCount {
